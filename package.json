@@ -1,0 +1,9 @@
+{
+  "dependencies": {
+    "big.js": "^6.2.2",
+    "typescript": "^5.8.2"
+  },
+  "devDependencies": {
+    "@types/big.js": "^6.2.2"
+  }
+}

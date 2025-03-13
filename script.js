@@ -46,11 +46,11 @@ class Stage {
     }
     onResize() {
         let viewSize = 30;
-        this.renderer.setSize(window.innerWidth, window.innerHeight);
-        this.camera.left = window.innerWidth / -viewSize;
-        this.camera.right = window.innerWidth / viewSize;
-        this.camera.top = window.innerHeight / viewSize;
-        this.camera.bottom = window.innerHeight / -viewSize;
+        this.renderer.setSize(window.innerWidth/2, window.innerHeight);
+        this.camera.left = (window.innerWidth/2) / -viewSize;
+        this.camera.right = (window.innerWidth/2) / viewSize;
+        this.camera.top = (window.innerHeight) / viewSize;
+        this.camera.bottom = (window.innerHeight) / -viewSize;
         this.camera.updateProjectionMatrix();
     }
 }
@@ -95,10 +95,34 @@ class Block {
         let geometry = new THREE.BoxGeometry(this.dimension.width, this.dimension.height, this.dimension.depth);
         geometry.applyMatrix(new THREE.Matrix4().makeTranslation(this.dimension.width / 2, this.dimension.height / 2, this.dimension.depth / 2));
         this.material = new THREE.MeshToonMaterial({ color: this.color, shading: THREE.FlatShading });
+        const loader = new THREE.TextureLoader();
+        const texture = loader.load( 'assets/crab.jpg' );
+        texture.colorSpace = THREE.SRGBColorSpace;
+        texture.wrapS = THREE.ClampToEdgeWrapping;
+        texture.wrapT = THREE.ClampToEdgeWrapping;
+        this.material = new THREE.MeshBasicMaterial({
+            shading: THREE.FlatShading,
+            color: this.color,
+            map: texture,
+        });
+        const materials = [
+            this.material,
+            new THREE.MeshLambertMaterial({ color: 'lightgray'}),
+            new THREE.MeshLambertMaterial({ color: 'lightgray'}),
+            new THREE.MeshLambertMaterial({ color: 'lightgray'}),
+            new THREE.MeshLambertMaterial({ color: 'lightgray'}),
+            new THREE.MeshLambertMaterial({ color: 'lightgray'}),
+            //new THREE.MeshLambertMaterial({ color: this.color}),
+           // new THREE.MeshLambertMaterial({ color: this.color}),
+            //new THREE.MeshLambertMaterial({ color: this.color}),
+           // new THREE.MeshLambertMaterial({ color: this.color})
+        ];
+        //this.material = materials;
         this.mesh = new THREE.Mesh(geometry, this.material);
         this.mesh.position.set(this.position.x, this.position.y + (this.state == this.STATES.ACTIVE ? 0 : 0), this.position.z);
-        if (this.state == this.STATES.ACTIVE) {
-            this.position[this.workingPlane] = Math.random() > 0.5 ? -this.MOVE_AMOUNT : this.MOVE_AMOUNT;
+        if (this.state === this.STATES.ACTIVE) {
+           // this.position[this.workingPlane] = Math.random() > 0.5 ? -this.MOVE_AMOUNT : this.MOVE_AMOUNT;
+            this.position[this.workingPlane] =  -this.MOVE_AMOUNT; //remove random
         }
     }
     reverseDirection() {
@@ -111,6 +135,7 @@ class Block {
             plane: this.workingPlane,
             direction: this.direction
         };
+        //if overlap < 0.3, consider it perfect alignment
         if (this.dimension[this.workingDimension] - overlap < 0.3) {
             overlap = this.dimension[this.workingDimension];
             blocksToReturn.bonus = true;
@@ -119,6 +144,8 @@ class Block {
             this.dimension.width = this.targetBlock.dimension.width;
             this.dimension.depth = this.targetBlock.dimension.depth;
         }
+        //if not a complete miss...
+        //(overlap = amount of overlap/match in moving/working direction)
         if (overlap > 0) {
             let choppedDimensions = { width: this.dimension.width, height: this.dimension.height, depth: this.dimension.depth };
             choppedDimensions[this.workingDimension] -= overlap;
@@ -146,6 +173,7 @@ class Block {
             if (!blocksToReturn.bonus)
                 blocksToReturn.chopped = choppedMesh;
         }
+        //complete miss
         else {
             this.state = this.STATES.MISSED;
         }
@@ -153,7 +181,7 @@ class Block {
         return blocksToReturn;
     }
     tick() {
-        if (this.state == this.STATES.ACTIVE) {
+        if (this.state === this.STATES.ACTIVE) {
             let value = this.position[this.workingPlane];
             if (value > this.MOVE_AMOUNT || value < -this.MOVE_AMOUNT)
                 this.reverseDirection();

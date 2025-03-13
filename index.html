@@ -1,31 +1,201 @@
 <!DOCTYPE html>
 <html lang="en" >
 <head>
-  <meta charset="UTF-8">
-  <title>Stack Game</title>
-  <link rel="stylesheet" href="./style.css">
+    <meta charset="UTF-8">
+    <title>Succinct Provable Stack Game</title>
+    <link rel="stylesheet" href="style.css">
 
 </head>
 <body>
 <meta name="viewport" content="width=device-width,user-scalable=no">
 
 <div id="container">
-	<div id="game"></div>
-	<div id="score">0</div>
-	<div id="instructions">Click (or press the spacebar) to place the block</div>
-	<div class="game-over">
-		<h2>Game Over</h2>
-		<p>You did great, you're the best.</p>
-		<p>Click or spacebar to start again</p>
-	</div>
-	<div class="game-ready">
-		<div id="start-button">Start</div>
-		<div></div>
-	</div>
+    <div id="game"></div>
+    <div id="score">0</div>
+    <div id="instructions">Click (or press the spacebar) to place the block</div>
+    <div class="game-over">
+        <h2>Game Over</h2>
+        <p>Thank you for playing. Please wait while proof is generated</p>
+        <button id="proofButton" hidden></button>
+        <div id="proofArea"></div>
+    </div>
+    <div class="game-ready">
+        <div id="start-button">Start</div>
+        <div></div>
+    </div>
 </div>
 <!-- partial -->
 <script src='https://cdnjs.cloudflare.com/ajax/libs/three.js/r83/three.min.js'></script>
-<script src='https://cdnjs.cloudflare.com/ajax/libs/gsap/latest/TweenMax.min.js'></script><script  src="./script.js"></script>
+<script src='https://cdnjs.cloudflare.com/ajax/libs/gsap/latest/TweenMax.min.js'></script>
+<script src='https://cdn.jsdelivr.net/npm/big.js@6.2.2/big.min.js'></script>
+<script  src="./script2.js"></script>
+<script type="module">
 
+
+
+    const HTTP_API_URL = 'http://129.153.12.18:8000';
+    const WS_API_URL = 'ws://129.153.12.18:8000';
+    export async function submitProof(ticksList, allegedScore, print) {
+        try {
+            if (!allegedScore || !ticksList || ticksList.length === 0) {
+                alert('Invalid proof data');
+                return;
+            }
+
+            const jobID = await requestProof(ticksList, allegedScore);
+            if (!jobID) {
+                return;
+            }
+            const result = await getProofResult(jobID, print);
+            console.log(result);
+            return result;
+        } catch (error) {
+            console.error('Error creating proof:', error);
+        }
+    }
+
+
+    async function requestProof(ticksList, allegedScore) {
+        try {
+            const inputData = JSON.stringify({
+                ticks_list: ticksList,
+                alleged_score : allegedScore
+            });
+            const response = await fetch(`${HTTP_API_URL}/prove`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: inputData,
+            });
+            const { job_id: jobID } = await response.json();
+            return jobID;
+        } catch (error) {
+            console.error('Error requesting proof:', error);
+        }
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    async function getProofResult(jobID, print){
+        return new Promise((resolve, reject) => {
+            const wsEndpoint = `${WS_API_URL}/proof/${jobID}`;
+            const socket = new WebSocket(wsEndpoint);
+
+            socket.addEventListener('message', (event) => {
+                const data = JSON.parse(event.data);
+                print(data);
+                if (data.status === 'processing') {
+                    console.log('Proof is being processed...');
+                } else if (data.status === 'complete') {
+                    socket.close();
+                    resolve(data);
+                } else if (data.status === 'failed' || data.status === 'not_found') {
+                    reject(new Error('Proof generation failed'));
+                }
+            });
+
+            socket.addEventListener('error', (error) => {
+                console.error('WebSocket error:', error);
+                socket.close();
+                reject(error);
+            });
+
+            setTimeout(() => {
+                socket.close();
+                reject(new Error('WebSocket connection timed out'));
+            }, 5 * 60000); // 5 min timeout
+        });
+    }
+
+    window.submitProof = submitProof;
+
+
+    //
+
+    function parseResult(e) {
+        if (typeof e === 'string') {
+            return [e];
+        }
+
+        const lines = [];
+        const o = e.data ? JSON.parse(e.data) : e;
+        if (!o.status && !o.proof) {
+            return [o.toString()];
+        }
+        if (o.proof) {
+            let u = o.host + '/' + o.proof;
+            lines.push('Proof generation succeeded!');
+            lines.push('Public values: ' + o.public_values);
+            lines.push('Proof file:' );
+            lines.push(u);
+            return lines;
+        }
+        const status = o.status.toLowerCase();
+        if (status.includes('processing')) {
+            lines.push('Proof is being processed...');
+        } else if (status.includes('complete')) {
+            let u = o.host + '/' + o.proof_data.proof;
+            lines.push('Proof generation succeeded!');
+            lines.push('Status: ' + o.status);
+            lines.push('Public values: ' + o.proof_data.public_values);
+            lines.push('Proof file:' );
+            lines.push(u);
+        } else {
+            lines.push('Proof generation failed!');
+            lines.push('Status: ' + o.status);
+        }
+        return lines;
+
+    }
+
+
+    function printStatus(s) {
+        /*if (n.includes('400')) {
+            s = 'Proof generation failed: ' + s.status;
+        } else if (n.includes('200')) {
+            s = parseSuccess(s);
+        }*/
+        let lines = parseResult(s);
+
+        /*const v = document.querySelector('#proofArea').value;
+        if (v) {
+            document.querySelector('#proofArea').value = v + '\n' + s;
+        } else {
+            document.querySelector('#proofArea').value = s;
+        }*/
+        const println = (str) => {
+            console.log(str);
+            let p = document.createElement('p');
+            p.innerText = str;
+            if (str.includes('://')) {
+                let a = document.createElement('a');
+                a.setAttribute('href', str);
+                a.appendChild(p);
+                p = a;
+            }
+            document.querySelector('#proofArea').appendChild(p);
+        }
+
+        for (let line of lines) {
+            println(line);
+        }
+
+    }
+
+    document.querySelector('button#proofButton').addEventListener('click', ev => {
+        let moves = game.gameInfo.history;
+        let score = moves.length;
+
+        alert('Submitting proof request');
+        submitProof(moves, score, printStatus).then(r => {
+            console.log(r);
+            const lines = parseResult(r);
+            alert(lines.join('\n'));
+        }).catch(e => {
+            alert(e);
+        });
+    });
+
+
+</script>
 </body>
 </html>
