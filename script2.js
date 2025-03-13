@@ -254,8 +254,8 @@ class Block {
         this.material = new THREE.MeshToonMaterial({ color: this.color, shading: THREE.FlatShading });
 
         const loader = new THREE.TextureLoader();
-        const files = ['crab.jpg', 'succinctHat2.jpg'];
-        const filePath = 'assets/' +  files[Math.floor(Math.random()*2)];
+        const files = ['crab.jpg', 'succinctHat2.jpg', 'yinger.png', 'captain-uma.webp'];
+        const filePath = 'assets/' +  files[this.blockInfo.index%files.length];
         const texture = loader.load( filePath );
         texture.colorSpace = THREE.SRGBColorSpace;
         texture.wrapS = THREE.ClampToEdgeWrapping;
